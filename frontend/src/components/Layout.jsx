@@ -1,11 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
  Drawer,
  AppBar,
  Toolbar,
  List,
  ListItem,
+ ListItemButton,
  ListItemIcon,
  ListItemText,
  IconButton,
@@ -18,6 +19,9 @@ import {
  ProductionQuantityLimits as ProductsIcon,
  ShoppingCart as BillingIcon,
  Receipt as BillsIcon,
+ People as ClientsIcon,
+ EventNote as BookingsIcon,
+ Category as EventTypesIcon,
  Logout as LogoutIcon,
  Menu as MenuIcon,
 } from '@mui/icons-material';
@@ -29,11 +33,15 @@ const menuItems = [
  { path: '/products', label: 'Products', icon: ProductsIcon },
  { path: '/billing', label: 'Billing', icon: BillingIcon },
  { path: '/bills', label: 'Bill List', icon: BillsIcon },
+ { path: '/clients', label: 'Clients', icon: ClientsIcon },
+ { path: '/bookings', label: 'Bookings', icon: BookingsIcon },
+ { path: '/event-types', label: 'Event Types', icon: EventTypesIcon },
 ];
 
 function Layout({ children, setToken }) {
  const [mobileOpen, setMobileOpen] = React.useState(false);
  const navigate = useNavigate();
+ const location = useLocation();
 
  const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -53,32 +61,38 @@ function Layout({ children, setToken }) {
    <Divider />
    <List>
     {menuItems.map((item) => (
-     <ListItem
-      button
-      key={item.path}
-      onClick={() => {
-       navigate(item.path);
-       setMobileOpen(false);
-      }}
-      sx={{
-       '&:hover': { backgroundColor: '#f59e0b20' },
-       '&.Mui-selected': { backgroundColor: '#f59e0b30', borderRight: '3px solid #f59e0b' },
-      }}
-     >
-      <ListItemIcon>
-       <item.icon sx={{ color: '#1e3a8a' }} />
-      </ListItemIcon>
-      <ListItemText primary={item.label} />
+     <ListItem key={item.path} disablePadding>
+      <ListItemButton
+       onClick={() => {
+        navigate(item.path);
+        setMobileOpen(false);
+       }}
+       selected={location.pathname === item.path}
+       sx={{
+        '&.Mui-selected': {
+         backgroundColor: '#f59e0b20',
+         borderRight: '3px solid #f59e0b',
+        },
+        '&:hover': { backgroundColor: '#f59e0b10' },
+       }}
+      >
+       <ListItemIcon>
+        <item.icon sx={{ color: location.pathname === item.path ? '#f59e0b' : '#1e3a8a' }} />
+       </ListItemIcon>
+       <ListItemText primary={item.label} />
+      </ListItemButton>
      </ListItem>
     ))}
    </List>
    <Divider />
    <List>
-    <ListItem button onClick={handleLogout}>
-     <ListItemIcon>
-      <LogoutIcon sx={{ color: '#d32f2f' }} />
-     </ListItemIcon>
-     <ListItemText primary="Logout" />
+    <ListItem disablePadding>
+     <ListItemButton onClick={handleLogout}>
+      <ListItemIcon>
+       <LogoutIcon sx={{ color: '#d32f2f' }} />
+      </ListItemIcon>
+      <ListItemText primary="Logout" />
+     </ListItemButton>
     </ListItem>
    </List>
   </div>
@@ -110,10 +124,7 @@ function Layout({ children, setToken }) {
      </Typography>
     </Toolbar>
    </AppBar>
-   <Box
-    component="nav"
-    sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-   >
+   <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}>
     <Drawer
      variant="temporary"
      open={mobileOpen}

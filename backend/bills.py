@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Bill, BillItem, Product
+from models import db, Bill, BillItem, Product, Booking, Client
+
 
 bills_bp = Blueprint('bills', __name__)
 
@@ -9,15 +10,15 @@ bills_bp = Blueprint('bills', __name__)
 def create_bill():
     user_id = get_jwt_identity()
     data = request.get_json()
-    items = data['items']          # list of {product_id, quantity}
+    items = data['items']
     customer_name = data['customer_name']
     customer_phone = data.get('customer_phone', '')
     discount = data.get('discount', 0)
     tax = data.get('tax', 0)
+    booking_id = data.get('booking_id')  # NEW: link to booking
 
     total_amount = 0
     bill_items = []
-
     for it in items:
         product = Product.query.get(it['product_id'])
         if not product:
@@ -33,6 +34,15 @@ def create_bill():
 
     grand_total = total_amount + tax - discount
 
+    # Create or find client
+    client = None
+    if customer_phone:
+        client = Client.query.filter_by(phone=customer_phone).first()
+        if not client:
+            client = Client(name=customer_name, phone=customer_phone)
+            db.session.add(client)
+            db.session.flush()
+
     bill = Bill(
         customer_name=customer_name,
         customer_phone=customer_phone,
@@ -40,14 +50,28 @@ def create_bill():
         discount=discount,
         tax=tax,
         grand_total=grand_total,
-        created_by=user_id
+        created_by=user_id,
+        booking_id=booking_id
     )
     db.session.add(bill)
-    db.session.flush()   # to get bill.id
+    db.session.flush()
 
     for bi in bill_items:
         item = BillItem(bill_id=bill.id, **bi)
         db.session.add(item)
+
+    # If linked to a booking, update booking balance and bill_id
+    if booking_id:
+        booking = Booking.query.get(booking_id)
+        if booking:
+            booking.bill_id = bill.id
+            # Reduce balance due by the grand total (assuming full payment)
+            # Actually, the bill amount may be partial. For simplicity, we reduce balance.
+            # But better to set balance due = total_amount - advance_paid - grand_total
+            # We'll keep it simple: new balance = max(0, booking.total_amount - booking.advance_paid - grand_total)
+            remaining = booking.total_amount - booking.advance_paid - grand_total
+            booking.balance_due = max(0, remaining)
+            db.session.add(booking)
 
     db.session.commit()
     return jsonify({'bill_id': bill.id, 'grand_total': grand_total}), 201
@@ -84,3 +108,4 @@ def get_bill_detail(bid):
             'total': i.total
         } for i in items]
     })  
+    

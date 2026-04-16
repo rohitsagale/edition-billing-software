@@ -13,22 +13,38 @@ import {
  Divider,
  InputAdornment,
  Alert,
+ Autocomplete,
 } from '@mui/material';
 import { Add, Remove, Delete, ShoppingCart } from '@mui/icons-material';
 import api from '../api';
 
 function Billing() {
  const [products, setProducts] = useState([]);
+ const [bookings, setBookings] = useState([]);
+ const [selectedBooking, setSelectedBooking] = useState(null);
  const [cart, setCart] = useState([]);
  const [customerName, setCustomerName] = useState('');
  const [customerPhone, setCustomerPhone] = useState('');
+ const [eventCategory, setEventCategory] = useState('');
  const [discount, setDiscount] = useState(0);
  const [tax, setTax] = useState(0);
  const [searchTerm, setSearchTerm] = useState('');
 
  useEffect(() => {
-  api.get('/products').then(res => setProducts(res.data));
+  fetchProducts();
+  fetchBookings();
  }, []);
+
+ const fetchProducts = async () => {
+  const res = await api.get('/products');
+  setProducts(res.data);
+ };
+
+ const fetchBookings = async () => {
+  const res = await api.get('/bookings');
+  // Only show confirmed/pending bookings that are not fully paid?
+  setBookings(res.data);
+ };
 
  const filteredProducts = products.filter(p =>
   p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -64,27 +80,69 @@ function Billing() {
   if (!customerName) return alert('Customer name required');
   if (cart.length === 0) return alert('Cart is empty');
   const items = cart.map(i => ({ product_id: i.id, quantity: i.qty }));
-  await api.post('/bills', {
+  const payload = {
    customer_name: customerName,
    customer_phone: customerPhone,
    items,
    discount,
    tax,
-  });
-  alert('Bill generated successfully!');
-  setCart([]);
-  setCustomerName('');
-  setCustomerPhone('');
-  setDiscount(0);
-  setTax(0);
+   booking_id: selectedBooking ? selectedBooking.id : null,
+  };
+  try {
+   await api.post('/bills', payload);
+   alert('Bill generated successfully!');
+   // Reset form
+   setCart([]);
+   setSelectedBooking(null);
+   setCustomerName('');
+   setCustomerPhone('');
+   setEventCategory('');
+   setDiscount(0);
+   setTax(0);
+   // Refresh bookings list to update balances
+   fetchBookings();
+  } catch (err) {
+   alert('Error creating bill: ' + (err.response?.data?.msg || err.message));
+  }
+ };
+
+ const handleBookingChange = (event, newValue) => {
+  setSelectedBooking(newValue);
+  if (newValue) {
+   setCustomerName(newValue.client_name);
+   setCustomerPhone(''); // you can fetch phone if needed
+   setEventCategory(newValue.event_type_name || '');
+  } else {
+   setCustomerName('');
+   setCustomerPhone('');
+   setEventCategory('');
+  }
  };
 
  return (
   <Box>
    <Typography variant="h4" gutterBottom>New Bill</Typography>
    <Grid container spacing={3}>
-    {/* Product selection */}
+    {/* Left: Booking selection & Product search */}
     <Grid item xs={12} md={7}>
+     <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
+      <Typography variant="subtitle1" gutterBottom>Link to Booking (Optional)</Typography>
+      <Autocomplete
+       options={bookings}
+       getOptionLabel={(opt) => `${opt.client_name} - ${opt.event_type_name || 'No event'} (${new Date(opt.event_date).toLocaleDateString()})`}
+       value={selectedBooking}
+       onChange={handleBookingChange}
+       renderInput={(params) => <TextField {...params} label="Select Booking" variant="outlined" size="small" fullWidth />}
+      />
+      {selectedBooking && (
+       <Alert severity="info" sx={{ mt: 1 }}>
+        <strong>Event:</strong> {eventCategory || '—'} &nbsp;|&nbsp;
+        <strong>Client:</strong> {customerName} &nbsp;|&nbsp;
+        <strong>Balance Due:</strong> ₹{selectedBooking.balance_due?.toLocaleString() || 0}
+       </Alert>
+      )}
+     </Paper>
+
      <Paper elevation={3} sx={{ p: 2 }}>
       <TextField
        fullWidth
@@ -106,10 +164,7 @@ function Billing() {
            </Button>
           }
          >
-          <ListItemText
-           primary={p.name}
-           secondary={`₹${p.price}`}
-          />
+          <ListItemText primary={p.name} secondary={`₹${p.price}`} />
          </ListItem>
         ))}
        </List>
@@ -117,7 +172,7 @@ function Billing() {
      </Paper>
     </Grid>
 
-    {/* Cart */}
+    {/* Right: Cart & Customer Details */}
     <Grid item xs={12} md={5}>
      <Paper elevation={3} sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom>
@@ -130,15 +185,27 @@ function Billing() {
        value={customerName}
        onChange={e => setCustomerName(e.target.value)}
        sx={{ mb: 1 }}
+       disabled={!!selectedBooking}
       />
       <TextField
-       label="Phone (optional)"
+       label="Phone"
        fullWidth
        size="small"
        value={customerPhone}
        onChange={e => setCustomerPhone(e.target.value)}
        sx={{ mb: 2 }}
+       disabled={!!selectedBooking}
       />
+      {eventCategory && (
+       <TextField
+        label="Event Category"
+        fullWidth
+        size="small"
+        value={eventCategory}
+        disabled
+        sx={{ mb: 2 }}
+       />
+      )}
       <Divider />
       <Box sx={{ maxHeight: 300, overflow: 'auto', mt: 2 }}>
        {cart.map(item => (
