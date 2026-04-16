@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
  Box,
  Grid,
@@ -17,48 +18,165 @@ import {
  TableRow,
  Paper,
  IconButton,
+ CircularProgress,
+ Alert,
+ Chip,
 } from '@mui/material';
-import { Receipt, Print } from '@mui/icons-material';
+import { Receipt, Print, Refresh, Edit, Delete } from '@mui/icons-material';
 import api from '../api';
 
 function BillList() {
  const [bills, setBills] = useState([]);
  const [selectedBill, setSelectedBill] = useState(null);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState('');
+ const navigate = useNavigate();
+
+ const fetchBills = async () => {
+  setLoading(true);
+  setError('');
+  try {
+   const res = await api.get('/bills');
+   if (Array.isArray(res.data)) {
+    setBills(res.data);
+   } else {
+    setBills([]);
+    setError('Invalid data format from server');
+   }
+  } catch (err) {
+   console.error('Fetch error:', err);
+   setError(err.response?.data?.msg || 'Failed to load bills');
+  } finally {
+   setLoading(false);
+  }
+ };
 
  useEffect(() => {
-  api.get('/bills').then(res => setBills(res.data));
+  fetchBills();
  }, []);
 
  const viewBillDetails = async (id) => {
-  const res = await api.get(`/bills/${id}`);
-  setSelectedBill(res.data);
+  try {
+   const res = await api.get(`/bills/${id}`);
+   setSelectedBill(res.data);
+  } catch (err) {
+   alert('Could not load bill details');
+  }
  };
+
+ const handleDelete = async (id, event) => {
+  event.stopPropagation(); // prevent opening details modal
+  if (window.confirm('Are you sure you want to delete this bill? This action cannot be undone.')) {
+   try {
+    await api.delete(`/bills/${id}`);
+    fetchBills(); // refresh list
+    if (selectedBill?.id === id) setSelectedBill(null);
+   } catch (err) {
+    alert('Failed to delete bill: ' + (err.response?.data?.msg || err.message));
+   }
+  }
+ };
+
+ const handleEdit = (id, event) => {
+  event.stopPropagation();
+  navigate(`/billing?edit_bill_id=${id}`);
+ };
+
+ if (loading) {
+  return (
+   <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+    <CircularProgress />
+   </Box>
+  );
+ }
+
+ if (error) {
+  return (
+   <Box>
+    <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+    <Button variant="contained" startIcon={<Refresh />} onClick={fetchBills}>
+     Retry
+    </Button>
+   </Box>
+  );
+ }
 
  return (
   <Box>
-   <Typography variant="h4" gutterBottom>All Bills</Typography>
-   <Grid container spacing={3}>
-    {bills.map(bill => (
-     <Grid item xs={12} sm={6} md={4} key={bill.id}>
-      <Card elevation={3} sx={{ cursor: 'pointer' }} onClick={() => viewBillDetails(bill.id)}>
-       <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-         <Box>
-          <Typography variant="body2" color="textSecondary">Bill #{bill.id}</Typography>
-          <Typography variant="h6">₹{bill.grand_total}</Typography>
-          <Typography variant="body2">{bill.customer_name}</Typography>
-          <Typography variant="caption" color="textSecondary">
-           {new Date(bill.date).toLocaleString()}
-          </Typography>
-         </Box>
-         <Receipt color="primary" />
-        </Box>
-       </CardContent>
-      </Card>
-     </Grid>
-    ))}
-   </Grid>
+   <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+    <Typography variant="h4">All Bills</Typography>
+    <Button variant="outlined" startIcon={<Refresh />} onClick={fetchBills}>
+     Refresh
+    </Button>
+   </Box>
 
+   {bills.length === 0 ? (
+    <Paper sx={{ p: 4, textAlign: 'center' }}>
+     <Typography color="textSecondary">No bills found. Create a bill from the Billing page.</Typography>
+    </Paper>
+   ) : (
+    <Grid container spacing={3}>
+     {bills.map((bill) => (
+      <Grid item xs={12} sm={6} md={4} key={bill.id}>
+       <Card
+        elevation={3}
+        sx={{
+         cursor: 'pointer',
+         transition: '0.2s',
+         '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 },
+        }}
+        onClick={() => viewBillDetails(bill.id)}
+       >
+        <CardContent>
+         <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+           <Typography variant="body2" color="textSecondary">
+            Bill #{bill.id}
+           </Typography>
+           <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
+            ₹{bill.grand_total?.toLocaleString()}
+           </Typography>
+           <Typography variant="body1" sx={{ mt: 1 }}>
+            {bill.customer_name}
+           </Typography>
+           <Typography variant="caption" color="textSecondary">
+            {bill.date ? new Date(bill.date).toLocaleString() : 'No date'}
+           </Typography>
+           {bill.booking_id && (
+            <Chip
+             label={`Booking #${bill.booking_id}`}
+             size="small"
+             sx={{ mt: 1, fontSize: '0.7rem' }}
+            />
+           )}
+          </Box>
+          <Box>
+           <IconButton
+            size="small"
+            color="primary"
+            onClick={(e) => handleEdit(bill.id, e)}
+            title="Edit Bill"
+           >
+            <Edit fontSize="small" />
+           </IconButton>
+           <IconButton
+            size="small"
+            color="error"
+            onClick={(e) => handleDelete(bill.id, e)}
+            title="Delete Bill"
+           >
+            <Delete fontSize="small" />
+           </IconButton>
+          </Box>
+         </Box>
+        </CardContent>
+       </Card>
+      </Grid>
+     ))}
+    </Grid>
+   )}
+
+   {/* Invoice Modal – same as before but added event category if available */}
    <Dialog open={!!selectedBill} onClose={() => setSelectedBill(null)} maxWidth="md" fullWidth>
     {selectedBill && (
      <>
@@ -69,25 +187,39 @@ function BillList() {
        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
-       <Typography variant="body2">Customer: {selectedBill.customer_name} ({selectedBill.customer_phone || 'N/A'})</Typography>
-       <Typography variant="body2" gutterBottom>Date: {new Date(selectedBill.date).toLocaleString()}</Typography>
+       <Typography variant="body1">
+        <strong>Customer:</strong> {selectedBill.customer_name} ({selectedBill.customer_phone || 'N/A'})
+       </Typography>
+       <Typography variant="body1" gutterBottom>
+        <strong>Date:</strong> {new Date(selectedBill.date).toLocaleString()}
+       </Typography>
+       {selectedBill.booking_id && (
+        <Typography variant="body1" gutterBottom>
+         <strong>Booking ID:</strong> #{selectedBill.booking_id}
+        </Typography>
+       )}
+       {selectedBill.event_category && (
+        <Typography variant="body1" gutterBottom>
+         <strong>Event Category:</strong> {selectedBill.event_category}
+        </Typography>
+       )}
        <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
         <Table size="small">
-         <TableHead>
+         <TableHead sx={{ bgcolor: '#f5f5f5' }}>
           <TableRow>
-           <TableCell>Item</TableCell>
-           <TableCell align="right">Qty</TableCell>
-           <TableCell align="right">Unit Price</TableCell>
-           <TableCell align="right">Total</TableCell>
+           <TableCell><strong>Item</strong></TableCell>
+           <TableCell align="right"><strong>Qty</strong></TableCell>
+           <TableCell align="right"><strong>Unit Price (₹)</strong></TableCell>
+           <TableCell align="right"><strong>Total (₹)</strong></TableCell>
           </TableRow>
          </TableHead>
          <TableBody>
-          {selectedBill.items.map((item, idx) => (
+          {selectedBill.items?.map((item, idx) => (
            <TableRow key={idx}>
             <TableCell>{item.product_name}</TableCell>
             <TableCell align="right">{item.quantity}</TableCell>
-            <TableCell align="right">₹{item.unit_price}</TableCell>
-            <TableCell align="right">₹{item.total}</TableCell>
+            <TableCell align="right">{item.unit_price}</TableCell>
+            <TableCell align="right">{item.total}</TableCell>
            </TableRow>
           ))}
          </TableBody>
@@ -97,7 +229,9 @@ function BillList() {
         <Typography variant="body2">Subtotal: ₹{selectedBill.total_amount}</Typography>
         <Typography variant="body2">Discount: ₹{selectedBill.discount}</Typography>
         <Typography variant="body2">Tax: ₹{selectedBill.tax}</Typography>
-        <Typography variant="h6">Grand Total: ₹{selectedBill.grand_total}</Typography>
+        <Typography variant="h6" sx={{ mt: 1 }}>
+         Grand Total: ₹{selectedBill.grand_total}
+        </Typography>
        </Box>
       </DialogContent>
      </>

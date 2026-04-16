@@ -9,14 +9,17 @@ import {
  Box,
  Alert,
  Avatar,
+ InputAdornment,
+ IconButton,
 } from '@mui/material';
-import { Camera as CameraIcon } from '@mui/icons-material';
+import { Camera, Visibility, VisibilityOff, Lock, Person } from '@mui/icons-material';
 import api from '../api';
 
 function Login({ setToken }) {
  const [username, setUsername] = useState('');
  const [password, setPassword] = useState('');
  const [error, setError] = useState('');
+ const [showPassword, setShowPassword] = useState(false);
  const navigate = useNavigate();
 
  const handleSubmit = async (e) => {
@@ -24,6 +27,7 @@ function Login({ setToken }) {
   try {
    const res = await api.post('/login', { username, password });
    localStorage.setItem('token', res.data.access_token);
+   localStorage.setItem('username', username);
    setToken(res.data.access_token);
    navigate('/dashboard');
   } catch (err) {
@@ -32,56 +36,91 @@ function Login({ setToken }) {
  };
 
  return (
-  <Container component="main" maxWidth="xs">
-   <Box
-    sx={{
-     marginTop: 8,
-     display: 'flex',
-     flexDirection: 'column',
-     alignItems: 'center',
-    }}
-   >
-    <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
-     <CameraIcon />
-    </Avatar>
-    <Typography component="h1" variant="h5">
-     Edition Films – Billing
-    </Typography>
-    <Paper elevation={3} sx={{ p: 4, mt: 3, width: '100%' }}>
+  <Box
+   sx={{
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    p: 2,
+   }}
+  >
+   <Container maxWidth="sm">
+    <Paper
+     elevation={24}
+     sx={{
+      p: 4,
+      borderRadius: 4,
+      backdropFilter: 'blur(10px)',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      textAlign: 'center',
+     }}
+    >
+     <Avatar sx={{ width: 80, height: 80, bgcolor: '#f59e0b', margin: '0 auto 16px auto' }}>
+      <Camera sx={{ fontSize: 48 }} />
+     </Avatar>
+     <Typography variant="h5" fontWeight="bold" gutterBottom>
+      Edition Films & Photography
+     </Typography>
+     <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+      Billing System Login
+     </Typography>
+
      <form onSubmit={handleSubmit}>
       <TextField
-       margin="normal"
-       required
        fullWidth
+       margin="normal"
        label="Username"
-       autoComplete="username"
-       autoFocus
+       variant="outlined"
        value={username}
        onChange={(e) => setUsername(e.target.value)}
+       InputProps={{ startAdornment: <InputAdornment position="start"><Person color="secondary" /></InputAdornment> }}
+       required
       />
       <TextField
-       margin="normal"
-       required
        fullWidth
+       margin="normal"
        label="Password"
-       type="password"
-       autoComplete="current-password"
+       type={showPassword ? 'text' : 'password'}
+       variant="outlined"
        value={password}
        onChange={(e) => setPassword(e.target.value)}
+       InputProps={{
+        startAdornment: <InputAdornment position="start"><Lock color="secondary" /></InputAdornment>,
+        endAdornment: (
+         <InputAdornment position="end">
+          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+           {showPassword ? <VisibilityOff /> : <Visibility />}
+          </IconButton>
+         </InputAdornment>
+        ),
+       }}
+       required
       />
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       <Button
        type="submit"
        fullWidth
        variant="contained"
-       sx={{ mt: 3, mb: 2 }}
+       sx={{
+        mt: 3,
+        mb: 2,
+        bgcolor: '#f59e0b',
+        '&:hover': { bgcolor: '#d97706' },
+        py: 1.5,
+        fontSize: '1rem',
+       }}
       >
        Sign In
       </Button>
      </form>
+     <Typography variant="caption" color="textSecondary">
+      © {new Date().getFullYear()} Edition Films – All rights reserved
+     </Typography>
     </Paper>
-   </Box>
-  </Container>
+   </Container>
+  </Box>
  );
 }
 

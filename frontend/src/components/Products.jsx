@@ -66,14 +66,19 @@ function Products() {
 
  const handleDelete = async (id) => {
   if (window.confirm('Delete this product?')) {
-   await api.delete(`/products/${id}`);
-   fetchProducts();
+   try {
+    await api.delete(`/products/${id}`);
+    fetchProducts();
+   } catch (error) {
+    console.error('Product delete failed:', error);
+    alert(error.response?.data?.msg || error.message || 'Product delete failed');
+   }
   }
  };
 
  return (
   <Box>
-   <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
     <Typography variant="h4">Products</Typography>
     <Button variant="contained" startIcon={<Add />} onClick={() => handleOpen()}>
      Add Product
