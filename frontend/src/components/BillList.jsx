@@ -35,7 +35,6 @@ function BillList() {
   setError('');
   try {
    const res = await api.get('/bills');
-   console.log('Bills fetched:', res.data);
    if (Array.isArray(res.data)) {
     setBills(res.data);
    } else {
@@ -161,6 +160,12 @@ function BillList() {
        {selectedBill.booking_id && (
         <Typography variant="body1" gutterBottom>
          <strong>Booking ID:</strong> #{selectedBill.booking_id}
+        </Typography>
+       )}
+       {/* ✅ Event Category added here */}
+       {selectedBill.event_category && (
+        <Typography variant="body1" gutterBottom>
+         <strong>Event Category:</strong> {selectedBill.event_category}
         </Typography>
        )}
        <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>

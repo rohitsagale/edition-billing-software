@@ -1,24 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
- Box,
- Grid,
- Paper,
- TextField,
- Button,
- Typography,
- List,
- ListItem,
- ListItemText,
- IconButton,
- Divider,
- InputAdornment,
- Alert,
- Autocomplete,
+ Box, Grid, Paper, TextField, Button, Typography, List, ListItem, ListItemText,
+ IconButton, Divider, InputAdornment, Alert, Autocomplete,
 } from '@mui/material';
 import { Add, Remove, Delete, ShoppingCart } from '@mui/icons-material';
 import api from '../api';
 
 function Billing() {
+ const [searchParams] = useSearchParams();
+ const bookingIdParam = searchParams.get('booking_id');
+
  const [products, setProducts] = useState([]);
  const [bookings, setBookings] = useState([]);
  const [selectedBooking, setSelectedBooking] = useState(null);
@@ -35,6 +27,18 @@ function Billing() {
   fetchBookings();
  }, []);
 
+ useEffect(() => {
+  if (bookingIdParam && bookings.length > 0) {
+   const booking = bookings.find(b => b.id === parseInt(bookingIdParam));
+   if (booking) {
+    setSelectedBooking(booking);
+    setCustomerName(booking.client_name);
+    setCustomerPhone(booking.client_phone || '');
+    setEventCategory(booking.event_type_name || '');
+   }
+  }
+ }, [bookingIdParam, bookings]);
+
  const fetchProducts = async () => {
   const res = await api.get('/products');
   setProducts(res.data);
@@ -42,7 +46,6 @@ function Billing() {
 
  const fetchBookings = async () => {
   const res = await api.get('/bookings');
-  // Only show confirmed/pending bookings that are not fully paid?
   setBookings(res.data);
  };
 
@@ -91,7 +94,6 @@ function Billing() {
   try {
    await api.post('/bills', payload);
    alert('Bill generated successfully!');
-   // Reset form
    setCart([]);
    setSelectedBooking(null);
    setCustomerName('');
@@ -99,10 +101,9 @@ function Billing() {
    setEventCategory('');
    setDiscount(0);
    setTax(0);
-   // Refresh bookings list to update balances
-   fetchBookings();
+   fetchBookings(); // refresh balances
   } catch (err) {
-   alert('Error creating bill: ' + (err.response?.data?.msg || err.message));
+   alert('Error: ' + (err.response?.data?.msg || err.message));
   }
  };
 
@@ -110,7 +111,7 @@ function Billing() {
   setSelectedBooking(newValue);
   if (newValue) {
    setCustomerName(newValue.client_name);
-   setCustomerPhone(''); // you can fetch phone if needed
+   setCustomerPhone(newValue.client_phone || '');
    setEventCategory(newValue.event_type_name || '');
   } else {
    setCustomerName('');
@@ -123,10 +124,9 @@ function Billing() {
   <Box>
    <Typography variant="h4" gutterBottom>New Bill</Typography>
    <Grid container spacing={3}>
-    {/* Left: Booking selection & Product search */}
     <Grid item xs={12} md={7}>
      <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-      <Typography variant="subtitle1" gutterBottom>Link to Booking (Optional)</Typography>
+      <Typography variant="subtitle1" gutterBottom>Select Booking (Optional)</Typography>
       <Autocomplete
        options={bookings}
        getOptionLabel={(opt) => `${opt.client_name} - ${opt.event_type_name || 'No event'} (${new Date(opt.event_date).toLocaleDateString()})`}
@@ -142,28 +142,17 @@ function Billing() {
        </Alert>
       )}
      </Paper>
-
      <Paper elevation={3} sx={{ p: 2 }}>
       <TextField
-       fullWidth
-       label="Search products"
-       variant="outlined"
-       size="small"
-       value={searchTerm}
-       onChange={e => setSearchTerm(e.target.value)}
-       sx={{ mb: 2 }}
+       fullWidth label="Search products" size="small" value={searchTerm}
+       onChange={e => setSearchTerm(e.target.value)} sx={{ mb: 2 }}
       />
       <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
        <List>
         {filteredProducts.map(p => (
-         <ListItem
-          key={p.id}
-          secondaryAction={
-           <Button variant="outlined" size="small" onClick={() => addToCart(p)}>
-            Add
-           </Button>
-          }
-         >
+         <ListItem key={p.id} secondaryAction={
+          <Button variant="outlined" size="small" onClick={() => addToCart(p)}>Add</Button>
+         }>
           <ListItemText primary={p.name} secondary={`₹${p.price}`} />
          </ListItem>
         ))}
@@ -171,100 +160,38 @@ function Billing() {
       </Box>
      </Paper>
     </Grid>
-
-    {/* Right: Cart & Customer Details */}
     <Grid item xs={12} md={5}>
      <Paper elevation={3} sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-       <ShoppingCart sx={{ mr: 1, verticalAlign: 'middle' }} /> Cart
-      </Typography>
-      <TextField
-       label="Customer Name"
-       fullWidth
-       size="small"
-       value={customerName}
-       onChange={e => setCustomerName(e.target.value)}
-       sx={{ mb: 1 }}
-       disabled={!!selectedBooking}
-      />
-      <TextField
-       label="Phone"
-       fullWidth
-       size="small"
-       value={customerPhone}
-       onChange={e => setCustomerPhone(e.target.value)}
-       sx={{ mb: 2 }}
-       disabled={!!selectedBooking}
-      />
+      <Typography variant="h6" gutterBottom><ShoppingCart sx={{ mr: 1 }} /> Cart</Typography>
+      <TextField label="Customer Name" fullWidth size="small" value={customerName}
+       onChange={e => setCustomerName(e.target.value)} sx={{ mb: 1 }} disabled={!!selectedBooking} />
+      <TextField label="Phone" fullWidth size="small" value={customerPhone}
+       onChange={e => setCustomerPhone(e.target.value)} sx={{ mb: 2 }} disabled={!!selectedBooking} />
       {eventCategory && (
-       <TextField
-        label="Event Category"
-        fullWidth
-        size="small"
-        value={eventCategory}
-        disabled
-        sx={{ mb: 2 }}
-       />
+       <TextField label="Event Category" fullWidth size="small" value={eventCategory} disabled sx={{ mb: 2 }} />
       )}
       <Divider />
       <Box sx={{ maxHeight: 300, overflow: 'auto', mt: 2 }}>
        {cart.map(item => (
         <Box key={item.id} display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-         <Box flex={1}>
-          <Typography variant="body2">{item.name}</Typography>
-          <Typography variant="caption">₹{item.price} x {item.qty}</Typography>
-         </Box>
+         <Box flex={1}><Typography variant="body2">{item.name}</Typography><Typography variant="caption">₹{item.price} x {item.qty}</Typography></Box>
          <Box>
-          <IconButton size="small" onClick={() => updateQty(item.id, -1)}><Remove fontSize="small" /></IconButton>
+          <IconButton size="small" onClick={() => updateQty(item.id, -1)}><Remove /></IconButton>
           <span>{item.qty}</span>
-          <IconButton size="small" onClick={() => updateQty(item.id, 1)}><Add fontSize="small" /></IconButton>
-          <IconButton size="small" color="error" onClick={() => removeItem(item.id)}><Delete fontSize="small" /></IconButton>
+          <IconButton size="small" onClick={() => updateQty(item.id, 1)}><Add /></IconButton>
+          <IconButton size="small" color="error" onClick={() => removeItem(item.id)}><Delete /></IconButton>
          </Box>
         </Box>
        ))}
        {cart.length === 0 && <Typography color="textSecondary" align="center">Cart empty</Typography>}
       </Box>
       <Divider sx={{ my: 2 }} />
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-       <Typography>Subtotal:</Typography>
-       <Typography>₹{subtotal}</Typography>
-      </Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-       <Typography>Discount (₹):</Typography>
-       <TextField
-        type="number"
-        size="small"
-        value={discount}
-        onChange={e => setDiscount(Number(e.target.value))}
-        sx={{ width: 100 }}
-        InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-       />
-      </Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-       <Typography>Tax (₹):</Typography>
-       <TextField
-        type="number"
-        size="small"
-        value={tax}
-        onChange={e => setTax(Number(e.target.value))}
-        sx={{ width: 100 }}
-        InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-       />
-      </Box>
+      <Box display="flex" justifyContent="space-between" mb={1}><Typography>Subtotal:</Typography><Typography>₹{subtotal}</Typography></Box>
+      <Box display="flex" justifyContent="space-between" mb={1}><Typography>Discount (₹):</Typography><TextField type="number" size="small" value={discount} onChange={e => setDiscount(Number(e.target.value))} sx={{ width: 100 }} InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} /></Box>
+      <Box display="flex" justifyContent="space-between" mb={1}><Typography>Tax (₹):</Typography><TextField type="number" size="small" value={tax} onChange={e => setTax(Number(e.target.value))} sx={{ width: 100 }} InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} /></Box>
       <Divider />
-      <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
-       <Typography variant="h6">Grand Total:</Typography>
-       <Typography variant="h6">₹{grandTotal}</Typography>
-      </Box>
-      <Button
-       fullWidth
-       variant="contained"
-       color="primary"
-       onClick={createBill}
-       sx={{ mt: 2 }}
-      >
-       Generate Bill
-      </Button>
+      <Box display="flex" justifyContent="space-between" mt={2}><Typography variant="h6">Grand Total:</Typography><Typography variant="h6">₹{grandTotal}</Typography></Box>
+      <Button fullWidth variant="contained" color="primary" onClick={createBill} sx={{ mt: 2 }}>Generate Bill</Button>
      </Paper>
     </Grid>
    </Grid>

@@ -6,7 +6,6 @@ import {
  Toolbar,
  List,
  ListItem,
- ListItemButton,
  ListItemIcon,
  ListItemText,
  IconButton,
@@ -28,13 +27,14 @@ import {
 
 const drawerWidth = 260;
 
+// ✅ योग्य क्रमानुसार मेनू आयटम
 const menuItems = [
  { path: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
- { path: '/products', label: 'Products', icon: ProductsIcon },
- { path: '/billing', label: 'Billing', icon: BillingIcon },
- { path: '/bills', label: 'Bill List', icon: BillsIcon },
  { path: '/clients', label: 'Clients', icon: ClientsIcon },
  { path: '/bookings', label: 'Bookings', icon: BookingsIcon },
+ { path: '/billing', label: 'Billing', icon: BillingIcon },
+ { path: '/bills', label: 'Bill List', icon: BillsIcon },
+ { path: '/products', label: 'Products', icon: ProductsIcon },
  { path: '/event-types', label: 'Event Types', icon: EventTypesIcon },
 ];
 
@@ -61,38 +61,36 @@ function Layout({ children, setToken }) {
    <Divider />
    <List>
     {menuItems.map((item) => (
-     <ListItem key={item.path} disablePadding>
-      <ListItemButton
-       onClick={() => {
-        navigate(item.path);
-        setMobileOpen(false);
-       }}
-       selected={location.pathname === item.path}
-       sx={{
-        '&.Mui-selected': {
-         backgroundColor: '#f59e0b20',
-         borderRight: '3px solid #f59e0b',
-        },
-        '&:hover': { backgroundColor: '#f59e0b10' },
-       }}
-      >
-       <ListItemIcon>
-        <item.icon sx={{ color: location.pathname === item.path ? '#f59e0b' : '#1e3a8a' }} />
-       </ListItemIcon>
-       <ListItemText primary={item.label} />
-      </ListItemButton>
+     <ListItem
+      button
+      key={item.path}
+      onClick={() => {
+       navigate(item.path);
+       setMobileOpen(false);
+      }}
+      selected={location.pathname === item.path}
+      sx={{
+       '&.Mui-selected': {
+        backgroundColor: '#f59e0b20',
+        borderRight: '3px solid #f59e0b',
+       },
+       '&:hover': { backgroundColor: '#f59e0b10' },
+      }}
+     >
+      <ListItemIcon>
+       <item.icon sx={{ color: location.pathname === item.path ? '#f59e0b' : '#1e3a8a' }} />
+      </ListItemIcon>
+      <ListItemText primary={item.label} />
      </ListItem>
     ))}
    </List>
    <Divider />
    <List>
-    <ListItem disablePadding>
-     <ListItemButton onClick={handleLogout}>
-      <ListItemIcon>
-       <LogoutIcon sx={{ color: '#d32f2f' }} />
-      </ListItemIcon>
-      <ListItemText primary="Logout" />
-     </ListItemButton>
+    <ListItem button onClick={handleLogout}>
+     <ListItemIcon>
+      <LogoutIcon sx={{ color: '#d32f2f' }} />
+     </ListItemIcon>
+     <ListItemText primary="Logout" />
     </ListItem>
    </List>
   </div>

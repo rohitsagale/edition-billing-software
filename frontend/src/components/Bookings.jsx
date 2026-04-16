@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
  Box,
  Typography,
@@ -29,6 +30,7 @@ import dayjs from 'dayjs';
 import api from '../api';
 
 function Bookings() {
+ const navigate = useNavigate();
  const [bookings, setBookings] = useState([]);
  const [clients, setClients] = useState([]);
  const [eventTypes, setEventTypes] = useState([]);
@@ -45,7 +47,6 @@ function Bookings() {
  });
  const [error, setError] = useState('');
 
- // Fetch data
  const fetchBookings = async () => {
   const res = await api.get('/bookings');
   setBookings(res.data);
@@ -149,17 +150,6 @@ function Bookings() {
   }
  };
 
- // Helper to get client name
- const getClientName = (clientId) => {
-  const client = clients.find(c => c.id === clientId);
-  return client ? client.name : 'Unknown';
- };
-
- const getEventTypeName = (typeId) => {
-  const type = eventTypes.find(t => t.id === typeId);
-  return type ? type.name : '—';
- };
-
  return (
   <LocalizationProvider dateAdapter={AdapterDayjs}>
    <Box>
@@ -205,11 +195,15 @@ function Bookings() {
           <IconButton size="small" color="error" onClick={() => handleDelete(b.id)}>
            <Delete fontSize="small" />
           </IconButton>
-          {!b.bill_id && (
-           <IconButton size="small" color="primary" onClick={() => alert('Redirect to billing with this booking')}>
-            <Receipt fontSize="small" />
-           </IconButton>
-          )}
+          {/* ✅ Generate Bill Button */}
+          <IconButton
+           size="small"
+           color="primary"
+           onClick={() => navigate(`/billing?booking_id=${b.id}`)}
+           title="Generate Bill from this booking"
+          >
+           <Receipt fontSize="small" />
+          </IconButton>
          </TableCell>
         </TableRow>
        ))}

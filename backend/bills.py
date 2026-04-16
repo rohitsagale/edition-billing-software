@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Bill, BillItem, Product, Booking, Client
+from models import db, Bill, BillItem, Product, Booking, Client,EventType
 
 
 bills_bp = Blueprint('bills', __name__)
@@ -87,11 +87,19 @@ def get_bills():
         'date': b.created_at.isoformat()
     } for b in bills])
 
+
 @bills_bp.route('/api/bills/<int:bid>', methods=['GET'])
 @jwt_required()
 def get_bill_detail(bid):
     bill = Bill.query.get_or_404(bid)
     items = BillItem.query.filter_by(bill_id=bid).all()
+    # Get event category if linked to booking
+    event_category = None
+    if bill.booking_id:
+        booking = Booking.query.get(bill.booking_id)
+        if booking and booking.event_type_id:
+            event_type = EventType.query.get(booking.event_type_id)
+            event_category = event_type.name if event_type else None
     return jsonify({
         'id': bill.id,
         'customer_name': bill.customer_name,
@@ -101,11 +109,12 @@ def get_bill_detail(bid):
         'tax': bill.tax,
         'grand_total': bill.grand_total,
         'date': bill.created_at.isoformat(),
+        'booking_id': bill.booking_id,
+        'event_category': event_category,  
         'items': [{
             'product_name': Product.query.get(i.product_id).name,
             'quantity': i.quantity,
             'unit_price': i.unit_price,
             'total': i.total
         } for i in items]
-    })  
-    
+    })    
