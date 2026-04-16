@@ -38,12 +38,26 @@ def update_product(pid):
     db.session.commit()
     return jsonify({'msg': 'Product updated'})
 
+
 @products_bp.route('/api/products/<int:pid>', methods=['DELETE'])
 @jwt_required()
 def delete_product(pid):
+    # Check admin role
     if not admin_required():
         return jsonify({'msg': 'Admin only'}), 403
+
     product = Product.query.get_or_404(pid)
-    db.session.delete(product)
-    db.session.commit()
-    return jsonify({'msg': 'Product deleted'})
+
+    # Check if product is used in any bill_item
+    from models import BillItem  # ensure import
+    used_in_bills = BillItem.query.filter_by(product_id=pid).first()
+    if used_in_bills:
+        return jsonify({'msg': 'Cannot delete this product because it is used in existing bills. Remove the product from bills first or delete the bills.'}), 400
+
+    try:
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({'msg': 'Product deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'msg': f'Database error: {str(e)}'}), 500
