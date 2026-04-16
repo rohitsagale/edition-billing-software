@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
  Box, Grid, Paper, TextField, Button, Typography, List, ListItem, ListItemText,
  IconButton, Divider, InputAdornment, Alert, Autocomplete,
@@ -9,7 +9,8 @@ import api from '../api';
 
 function Billing() {
  const [searchParams] = useSearchParams();
- const bookingIdParam = searchParams.get('booking_id');
+ const editBillId = searchParams.get('edit_bill_id');
+ const navigate = useNavigate();
 
  const [products, setProducts] = useState([]);
  const [bookings, setBookings] = useState([]);
@@ -21,6 +22,7 @@ function Billing() {
  const [discount, setDiscount] = useState(0);
  const [tax, setTax] = useState(0);
  const [searchTerm, setSearchTerm] = useState('');
+ const [isEditMode, setIsEditMode] = useState(false);
 
  useEffect(() => {
   fetchProducts();
@@ -28,16 +30,10 @@ function Billing() {
  }, []);
 
  useEffect(() => {
-  if (bookingIdParam && bookings.length > 0) {
-   const booking = bookings.find(b => b.id === parseInt(bookingIdParam));
-   if (booking) {
-    setSelectedBooking(booking);
-    setCustomerName(booking.client_name);
-    setCustomerPhone(booking.client_phone || '');
-    setEventCategory(booking.event_type_name || '');
-   }
+  if (editBillId) {
+   fetchBillForEdit(editBillId);
   }
- }, [bookingIdParam, bookings]);
+ }, [editBillId]);
 
  const fetchProducts = async () => {
   const res = await api.get('/products');
@@ -47,6 +43,32 @@ function Billing() {
  const fetchBookings = async () => {
   const res = await api.get('/bookings');
   setBookings(res.data);
+ };
+
+ const fetchBillForEdit = async (id) => {
+  try {
+   const res = await api.get(`/bills/${id}`);
+   const bill = res.data;
+   setCustomerName(bill.customer_name);
+   setCustomerPhone(bill.customer_phone || '');
+   setDiscount(bill.discount);
+   setTax(bill.tax);
+   const cartItems = bill.items.map(item => ({
+    id: item.product_id,
+    name: item.product_name,
+    price: item.unit_price,
+    qty: item.quantity
+   }));
+   setCart(cartItems);
+   setIsEditMode(true);
+   if (bill.booking_id) {
+    const booking = bookings.find(b => b.id === bill.booking_id);
+    if (booking) setSelectedBooking(booking);
+   }
+  } catch (err) {
+   console.error('Failed to load bill for edit', err);
+   alert('Could not load bill data');
+  }
  };
 
  const filteredProducts = products.filter(p =>
@@ -79,7 +101,7 @@ function Billing() {
  const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
  const grandTotal = subtotal + tax - discount;
 
- const createBill = async () => {
+ const saveBill = async () => {
   if (!customerName) return alert('Customer name required');
   if (cart.length === 0) return alert('Cart is empty');
   const items = cart.map(i => ({ product_id: i.id, quantity: i.qty }));
@@ -92,8 +114,14 @@ function Billing() {
    booking_id: selectedBooking ? selectedBooking.id : null,
   };
   try {
-   await api.post('/bills', payload);
-   alert('Bill generated successfully!');
+   if (isEditMode && editBillId) {
+    await api.put(`/bills/${editBillId}`, payload);
+    alert('Bill updated successfully!');
+   } else {
+    await api.post('/bills', payload);
+    alert('Bill generated successfully!');
+   }
+   // Reset form
    setCart([]);
    setSelectedBooking(null);
    setCustomerName('');
@@ -101,7 +129,9 @@ function Billing() {
    setEventCategory('');
    setDiscount(0);
    setTax(0);
-   fetchBookings(); // refresh balances
+   setIsEditMode(false);
+   fetchBookings();
+   navigate('/bills');
   } catch (err) {
    alert('Error: ' + (err.response?.data?.msg || err.message));
   }
@@ -122,7 +152,9 @@ function Billing() {
 
  return (
   <Box>
-   <Typography variant="h4" gutterBottom>New Bill</Typography>
+   <Typography variant="h4" gutterBottom>
+    {isEditMode ? 'Edit Bill' : 'New Bill'}
+   </Typography>
    <Grid container spacing={3}>
     <Grid item xs={12} md={7}>
      <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
@@ -191,7 +223,9 @@ function Billing() {
       <Box display="flex" justifyContent="space-between" mb={1}><Typography>Tax (₹):</Typography><TextField type="number" size="small" value={tax} onChange={e => setTax(Number(e.target.value))} sx={{ width: 100 }} InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} /></Box>
       <Divider />
       <Box display="flex" justifyContent="space-between" mt={2}><Typography variant="h6">Grand Total:</Typography><Typography variant="h6">₹{grandTotal}</Typography></Box>
-      <Button fullWidth variant="contained" color="primary" onClick={createBill} sx={{ mt: 2 }}>Generate Bill</Button>
+      <Button fullWidth variant="contained" color="primary" onClick={saveBill} sx={{ mt: 2 }}>
+       {isEditMode ? 'Update Bill' : 'Generate Bill'}
+      </Button>
      </Paper>
     </Grid>
    </Grid>

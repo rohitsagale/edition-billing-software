@@ -75,7 +75,7 @@ function Dashboard() {
 
  return (
   <Box>
-   <Typography variant="h4" gutterBottom>
+   <Typography variant="h4" gutterBottom sx={{ mb: 2 }}>
     Dashboard Analytics
    </Typography>
 

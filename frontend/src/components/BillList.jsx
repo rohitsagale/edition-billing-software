@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
  Box,
  Grid,
@@ -21,7 +22,7 @@ import {
  Alert,
  Chip,
 } from '@mui/material';
-import { Receipt, Print, Refresh, EventNote } from '@mui/icons-material';
+import { Receipt, Print, Refresh, Edit, Delete } from '@mui/icons-material';
 import api from '../api';
 
 function BillList() {
@@ -29,6 +30,7 @@ function BillList() {
  const [selectedBill, setSelectedBill] = useState(null);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState('');
+ const navigate = useNavigate();
 
  const fetchBills = async () => {
   setLoading(true);
@@ -60,6 +62,24 @@ function BillList() {
   } catch (err) {
    alert('Could not load bill details');
   }
+ };
+
+ const handleDelete = async (id, event) => {
+  event.stopPropagation(); // prevent opening details modal
+  if (window.confirm('Are you sure you want to delete this bill? This action cannot be undone.')) {
+   try {
+    await api.delete(`/bills/${id}`);
+    fetchBills(); // refresh list
+    if (selectedBill?.id === id) setSelectedBill(null);
+   } catch (err) {
+    alert('Failed to delete bill: ' + (err.response?.data?.msg || err.message));
+   }
+  }
+ };
+
+ const handleEdit = (id, event) => {
+  event.stopPropagation();
+  navigate(`/billing?edit_bill_id=${id}`);
  };
 
  if (loading) {
@@ -126,12 +146,28 @@ function BillList() {
             <Chip
              label={`Booking #${bill.booking_id}`}
              size="small"
-             icon={<EventNote fontSize="small" />}
              sx={{ mt: 1, fontSize: '0.7rem' }}
             />
            )}
           </Box>
-          <Receipt color="primary" sx={{ fontSize: 40, opacity: 0.7 }} />
+          <Box>
+           <IconButton
+            size="small"
+            color="primary"
+            onClick={(e) => handleEdit(bill.id, e)}
+            title="Edit Bill"
+           >
+            <Edit fontSize="small" />
+           </IconButton>
+           <IconButton
+            size="small"
+            color="error"
+            onClick={(e) => handleDelete(bill.id, e)}
+            title="Delete Bill"
+           >
+            <Delete fontSize="small" />
+           </IconButton>
+          </Box>
          </Box>
         </CardContent>
        </Card>
@@ -140,7 +176,7 @@ function BillList() {
     </Grid>
    )}
 
-   {/* Invoice Modal */}
+   {/* Invoice Modal – same as before but added event category if available */}
    <Dialog open={!!selectedBill} onClose={() => setSelectedBill(null)} maxWidth="md" fullWidth>
     {selectedBill && (
      <>
@@ -162,7 +198,6 @@ function BillList() {
          <strong>Booking ID:</strong> #{selectedBill.booking_id}
         </Typography>
        )}
-       {/* ✅ Event Category added here */}
        {selectedBill.event_category && (
         <Typography variant="body1" gutterBottom>
          <strong>Event Category:</strong> {selectedBill.event_category}

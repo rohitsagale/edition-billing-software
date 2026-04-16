@@ -118,3 +118,57 @@ def get_bill_detail(bid):
             'total': i.total
         } for i in items]
     })    
+
+
+@bills_bp.route('/api/bills/<int:bid>', methods=['DELETE'])
+@jwt_required()
+def delete_bill(bid):
+    bill = Bill.query.get_or_404(bid)
+    # Delete all related bill items first
+    BillItem.query.filter_by(bill_id=bid).delete()
+    # Then delete the bill itself
+    db.session.delete(bill)
+    db.session.commit()
+    return jsonify({'msg': 'Bill deleted successfully'}), 200
+
+@bills_bp.route('/api/bills/<int:bid>', methods=['PUT'])
+@jwt_required()
+def update_bill(bid):
+    bill = Bill.query.get_or_404(bid)
+    data = request.get_json()
+    
+    # Update basic fields
+    bill.customer_name = data.get('customer_name', bill.customer_name)
+    bill.customer_phone = data.get('customer_phone', bill.customer_phone)
+    bill.discount = data.get('discount', bill.discount)
+    bill.tax = data.get('tax', bill.tax)
+    
+    # Recalculate totals if items change – but here we expect items to be sent
+    # We'll replace all items
+    items_data = data.get('items', [])
+    
+    # Delete existing items
+    for item in bill.items:
+        db.session.delete(item)
+    
+    total_amount = 0
+    for it in items_data:
+        product = Product.query.get(it['product_id'])
+        if not product:
+            return jsonify({'msg': f'Product {it["product_id"]} not found'}), 400
+        line_total = product.price * it['quantity']
+        total_amount += line_total
+        new_item = BillItem(
+            bill_id=bill.id,
+            product_id=it['product_id'],
+            quantity=it['quantity'],
+            unit_price=product.price,
+            total=line_total
+        )
+        db.session.add(new_item)
+    
+    bill.total_amount = total_amount
+    bill.grand_total = total_amount + bill.tax - bill.discount
+    
+    db.session.commit()
+    return jsonify({'msg': 'Bill updated', 'bill_id': bill.id}), 200
